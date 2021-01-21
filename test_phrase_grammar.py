@@ -1,7 +1,7 @@
 import argparse
 import re
 
-import matplotlib.pyplot as plt
+#import matplotlib.pyplot as plt
 import nltk
 import numpy
 import torch
@@ -251,7 +251,7 @@ if __name__ == '__main__':
     # Model parameters.
     parser.add_argument('--data', type=str, default='data/ptb',
                         help='location of the data corpus')
-    parser.add_argument('--checkpoint', type=str, default='PTB.pt',
+    parser.add_argument('--checkpoint', type=str, default='16112138038818557.pt',
                         help='model checkpoint to use')
     parser.add_argument('--seed', type=int, default=1111,
                         help='random seed')

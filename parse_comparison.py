@@ -15,7 +15,7 @@ $ python scripts/parse_comparison.py \
     --report_path ./logs/example-nli.report \
 """
 
-import gflags
+#import gflags
 import sys
 import codecs
 import json
@@ -27,7 +27,7 @@ from collections import Counter
 
 LABEL_MAP = {'entailment': 0, 'neutral': 1, 'contradiction': 2}
 
-FLAGS = gflags.FLAGS
+FLAGS = None
 
 mathops = ["[MAX", "[MIN", "[MED", "[SM"]
 
@@ -515,10 +515,10 @@ def ConvertBinaryBracketedSeq(seq):
 
 def run():
     gt = {}
-    # gt_labeled = {}
+    gt_labeled = {}
     with codecs.open(FLAGS.main_data_path, encoding='utf-8') as f:
         for example_id, line in enumerate(f):
-            if FLAGS.data_type == "nli":
+            if FLAGS.data_type.value == "nli":
                 loaded_example = json.loads(line)
                 if loaded_example["gold_label"] not in LABEL_MAP:
                     continue
@@ -531,13 +531,13 @@ def run():
                     continue  # Stanford parser tree binarizer doesn't handle phone numbers properly.
                 gt[loaded_example['pairID'] + "_1"] = loaded_example['sentence1_binary_parse']
                 gt[loaded_example['pairID'] + "_2"] = loaded_example['sentence2_binary_parse']
-                # gt_labeled[loaded_example['pairID'] + "_1"] = loaded_example['sentence1_parse']
-                # gt_labeled[loaded_example['pairID'] + "_2"] = loaded_example['sentence2_parse']
+                gt_labeled[loaded_example['pairID'] + "_1"] = loaded_example['sentence1_parse']
+                gt_labeled[loaded_example['pairID'] + "_2"] = loaded_example['sentence2_parse']
 
                 gt_labeled[loaded_example['pairID'] + "_1"] = loaded_example['sentence1_parse']
                 gt_labeled[loaded_example['pairID'] + "_2"] = loaded_example['sentence2_parse']
 
-            elif FLAGS.data_type == "sst":
+            elif FLAGS.data_type.value == "sst":
                 line = line.strip()
                 stack = []
                 words = line.replace(')', ' )')
@@ -553,7 +553,7 @@ def run():
                             stack.append(word)
                 gt[str(example_id) + "_1"] = stack[0]
 
-            elif FLAGS.data_type == "listops":
+            elif FLAGS.data_type.value == "listops":
                 line = line.strip()
                 label, seq = line.split('\t')
                 if len(seq) <= 1:
@@ -623,11 +623,11 @@ def run():
         report_paths = glob.glob(FLAGS.main_report_path_template)
         for path in report_paths:
             print("Loading", path)
-            if FLAGS.data_type == "nli":
+            if FLAGS.data_type.value == "nli":
                 reports.append(read_nli_report(path))
-            elif FLAGS.data_type == "sst":
+            elif FLAGS.data_type.value == "sst":
                 reports.append(read_sst_report(path))
-            elif FLAGS.data_type == "listops":
+            elif FLAGS.data_type.value == "listops":
                 reports.append(read_listops_report(path))
         if FLAGS.main_report_path_template != "_":
             ptb_report_paths = glob.glob(FLAGS.ptb_report_path_template)
@@ -657,7 +657,7 @@ def run():
                 print(to_latex(report[sentence]))
                 print()
 
-        if FLAGS.data_type == "listops":
+        if FLAGS.data_type.value == "listops":
             gtf1, gtcp = corpus_stats(report, gt, first_two=FLAGS.first_two, neg_pair=FLAGS.neg_pair, const_parse=True)
         else:
             gtf1, gtcp = corpus_stats(report, gt, first_two=FLAGS.first_two, neg_pair=FLAGS.neg_pair, const_parse=False)
@@ -684,26 +684,37 @@ def run():
     for key in sorted(total):
         print(key + '\t' + str(correct[key] * 1. / total[key]))
 
+from enum import Enum
 
+class data_type(Enum):
+    nli = "nli"
+    sst = "sst"
+    listops = "listops"
+
+    def __str__(self):
+        return self.value
+
+import argparse
 if __name__ == '__main__':
-    gflags.DEFINE_string("main_report_path_template", "./checkpoints/*.report",
-                         "A template (with wildcards input as \*) for the paths to the main reports.")
-    gflags.DEFINE_string("main_data_path", "./snli_1.0/snli_1.0_dev.jsonl",
-                         "A template (with wildcards input as \*) for the paths to the main reports.")
-    gflags.DEFINE_string("ptb_report_path_template", "_",
-                         "A template (with wildcards input as \*) for the paths to the PTB reports, or '_' if not available.")
-    gflags.DEFINE_string("ptb_data_path", "_", "The path to the PTB data in SNLI format, or '_' if not available.")
-    gflags.DEFINE_boolean("compute_self_f1", True,
-                          "Compute self F1 over all reports matching main_report_path_template.")
-    gflags.DEFINE_boolean("use_random_parses", False,
-                          "Replace all report trees with randomly generated trees. Report path template flags are not used when this is set.")
-    gflags.DEFINE_boolean("use_balanced_parses", False,
-                          "Replace all report trees with roughly-balanced binary trees. Report path template flags are not used when this is set.")
-    gflags.DEFINE_boolean("first_two", False, "Show 'first two' and 'last two' metrics.")
-    gflags.DEFINE_boolean("neg_pair", False, "Show 'neg_pair' metric.")
-    gflags.DEFINE_enum("data_type", "nli", ["nli", "sst", "listops"], "Data Type")
-    gflags.DEFINE_integer("print_latex", 0, "Print this many trees in LaTeX format for each report.")
-
-    FLAGS(sys.argv)
+    parser = argparse.ArgumentParser(description='PyTorch PennTreeBank RNN/LSTM Language Model')
+    parser.add_argument('--main_report_path_template', type=str, default="./checkpoints/*.report",
+                        help="A template (with wildcards input as \*) for the paths to the main reports.")
+    parser.add_argument('--main_data_path', type=str, default='./snli_1.0/snli_1.0_dev.jsonl',
+                        help='A template (with wildcards input as \*) for the paths to the main reports.')
+    parser.add_argument('--ptb_report_path_template', type=str, default='_',
+                        help="A template (with wildcards input as \*) for the paths to the PTB reports, or '_' if not available.")
+    parser.add_argument('--ptb_data_path', type=str, default='_',
+                        help="The path to the PTB data in SNLI format, or '_' if not available.")
+    parser.add_argument('--compute_self_f1', type=bool, default=True,
+                        help='Compute self F1 over all reports matching main_report_path_template.')
+    parser.add_argument('--use_random_parses', type=bool, default=False,
+                        help='Replace all report trees with randomly generated trees. Report path template flags are not used when this is set.')
+    parser.add_argument('--use_balanced_parses', type=bool, default=False,
+                        help='Replace all report trees with roughly-balanced binary trees. Report path template flags are not used when this is set.')
+    parser.add_argument('--first_two', type=bool, default=False, help="Show 'first two' and 'last two' metrics.")
+    parser.add_argument('--neg_pair', type=bool, default=False, help="Show 'neg_pair' metric.")
+    parser.add_argument('--data_type', type=data_type, default="nli", choices= list(data_type), help="Data Type")
+    parser.add_argument('--print_latex', type=int, default=0, help="Print this many trees in LaTeX format for each report.")
+    FLAGS = parser.parse_args()
 
     run()
